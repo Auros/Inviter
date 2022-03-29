@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using NodaTime;
 using System.Security.Claims;
 
 namespace Inviter.Server.Controllers;
@@ -13,13 +14,15 @@ namespace Inviter.Server.Controllers;
 [Route("api/login")]
 public class LoginController : ControllerBase
 {
+    private readonly IClock _clock;
     private readonly ILogger _logger;
     private readonly InviterContext _inviterContext;
     private readonly ISoriginService _soriginService;
     private readonly InviterSettings _inviterSettings;
 
-    public LoginController(ILogger<LoginController> logger, InviterContext inviterContext, ISoriginService soriginService, InviterSettings inviterSettings)
+    public LoginController(IClock clock, ILogger<LoginController> logger, InviterContext inviterContext, ISoriginService soriginService, InviterSettings inviterSettings)
     {
+        _clock = clock;
         _logger = logger;
         _inviterContext = inviterContext;
         _inviterSettings = inviterSettings;
@@ -46,6 +49,7 @@ public class LoginController : ControllerBase
                 Country = soriginUser.Country,
                 Username = soriginUser.Username,
                 ProfilePicture = profilePicture,
+                LastSeen = _clock.GetCurrentInstant(),
             };
             _inviterContext.Users.Add(user);
             await _inviterContext.SaveChangesAsync();
@@ -55,8 +59,11 @@ public class LoginController : ControllerBase
             user.Username = soriginUser.Username;
             user.ProfilePicture = profilePicture;
             user.Country = soriginUser.Country;
-            await _inviterContext.SaveChangesAsync();
         }
+
+        user.LastSeen = _clock.GetCurrentInstant();
+        await _inviterContext.SaveChangesAsync();
+
         List<Claim> claims = new()
         {
             new(InviterExtensions.UserID, user.ID.ToString()),
@@ -74,7 +81,13 @@ public class LoginController : ControllerBase
     {
         ulong id = HttpContext.GetInviterID();
         User? user = await _inviterContext.Users.FirstOrDefaultAsync(u => u.ID == id);
-        return user is null ? NotFound() : Ok(user);
+
+        if (user is null)
+            return NotFound();
+
+        user.LastSeen = _clock.GetCurrentInstant();
+        await _inviterContext.SaveChangesAsync();
+        return Ok(user);
     }
 
     public class LoginBody

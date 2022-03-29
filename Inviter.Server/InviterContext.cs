@@ -9,6 +9,7 @@ public class InviterContext : DbContext
     private readonly ILogger _logger;
 
     public DbSet<User> Users => Set<User>();
+    public DbSet<Invite> Invites => Set<Invite>();
 
     public InviterContext(ILogger<InviterContext> logger, DbContextOptions<InviterContext> options) : base(options)
     {
