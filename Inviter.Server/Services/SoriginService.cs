@@ -35,7 +35,7 @@ internal class SoriginService : ISoriginService
         };
 
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        request.Headers.UserAgent.Add(new ProductInfoHeaderValue("Inviter", _version.ToString()));
+        request.Headers.UserAgent.Add(new ProductInfoHeaderValue(nameof(Inviter), _version.ToString()));
 
         HttpResponseMessage response = await _httpClient.SendAsync(request);
         if (!response.IsSuccessStatusCode)

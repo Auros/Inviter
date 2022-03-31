@@ -13,14 +13,16 @@ public class SocketController : ControllerBase
 {
     private readonly IClock _clock;
     private readonly ILogger _logger;
+    private readonly PlayerService _playerService;
     private readonly ISoriginService _soriginService;
     private readonly InviterSettings _inviterSettings;
     private readonly IDbContextFactory<InviterContext> _inviterContextFactory;
 
-    public SocketController(IClock clock, ILogger<SocketController> logger, ISoriginService soriginService, InviterSettings inviterSettings, IDbContextFactory<InviterContext> inviterContextFactory)
+    public SocketController(IClock clock, ILogger<SocketController> logger, PlayerService playerService, ISoriginService soriginService, InviterSettings inviterSettings, IDbContextFactory<InviterContext> inviterContextFactory)
     {
         _clock = clock;
         _logger = logger;
+        _playerService = playerService;
         _soriginService = soriginService;
         _inviterSettings = inviterSettings;
         _inviterContextFactory = inviterContextFactory;
@@ -92,6 +94,8 @@ public class SocketController : ControllerBase
 
         TaskCompletionSource source = new();
         void Finished() => source.SetResult();
+
+        PlayerInfo playerInfo = new(user, webSocket, Finished, _clock.GetCurrentInstant());
 
         _ = Task.Run(async () =>
         {

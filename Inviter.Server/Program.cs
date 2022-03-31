@@ -1,7 +1,6 @@
 using Inviter.Server;
 using Inviter.Server.Models;
 using Inviter.Server.Services;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.WebSockets;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
@@ -35,9 +34,8 @@ builder.Services.AddDbContext<InviterContext>(dbOptions);
 builder.Services.AddSingleton<IClock>(SystemClock.Instance);
 builder.Services.AddSingleton<ISoriginService, SoriginService>();
 builder.Services.AddSingleton(Assembly.GetExecutingAssembly().GetName().Version!);
-builder.Services.AddWebSockets(o => o.KeepAliveInterval = TimeSpan.FromMinutes(1));
+builder.Services.AddWebSockets(o => o.KeepAliveInterval = TimeSpan.FromMinutes(2f));
 builder.Services.AddDbContextFactory<InviterContext>(dbOptions, ServiceLifetime.Transient);
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(o => o.Cookie.Name = "inviter.session.cookie");
 
 var app = builder.Build();
 
@@ -45,7 +43,6 @@ var app = builder.Build();
 
 app.UseRouting();
 app.UseWebSockets();
-app.UseCookiePolicy(new() { MinimumSameSitePolicy = SameSiteMode.None });
 app.UseEndpoints(endpoints =>
 {
     endpoints.MapControllers();
