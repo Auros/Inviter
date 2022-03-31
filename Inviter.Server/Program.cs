@@ -1,9 +1,8 @@
 using Inviter.Server;
-using Inviter.Server.Authorization;
 using Inviter.Server.Models;
 using Inviter.Server.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.WebSockets;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
 using NodaTime.Serialization.SystemTextJson;
@@ -20,6 +19,7 @@ Log.Logger = new LoggerConfiguration()
 var builder = WebApplication.CreateBuilder(args);
 
 var inviterSettings = builder.Configuration.GetRequiredSection(nameof(Inviter)).Get<InviterSettings>();
+Action<DbContextOptionsBuilder> dbOptions = o => { o.UseNpgsql(builder.Configuration.GetConnectionString("Default"), o => o.UseNodaTime()); o.UseSnakeCaseNamingConvention(); };
 // Add services to the container.
 
 builder.Host.UseSerilog();
@@ -30,26 +30,22 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 });
 
 builder.Services.AddHttpClient();
-builder.Services.AddAuthorization();
-builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton(inviterSettings!);
+builder.Services.AddDbContext<InviterContext>(dbOptions);
 builder.Services.AddSingleton<IClock>(SystemClock.Instance);
 builder.Services.AddSingleton<ISoriginService, SoriginService>();
 builder.Services.AddSingleton(Assembly.GetExecutingAssembly().GetName().Version!);
-builder.Services.AddSingleton<IAuthorizationHandler, InviterStateAuthorizationHandler>();
-builder.Services.AddSingleton<IAuthorizationPolicyProvider, InviterAuthorizationPolicyProvider>();
-builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler, InviterAuthorizationMiddlewareResultHandler>();
+builder.Services.AddWebSockets(o => o.KeepAliveInterval = TimeSpan.FromMinutes(1));
+builder.Services.AddDbContextFactory<InviterContext>(dbOptions, ServiceLifetime.Transient);
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(o => o.Cookie.Name = "inviter.session.cookie");
-builder.Services.AddDbContext<InviterContext>(o => { o.UseNpgsql(builder.Configuration.GetConnectionString("Default"), o => o.UseNodaTime()); o.UseSnakeCaseNamingConvention(); });
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 
 app.UseRouting();
+app.UseWebSockets();
 app.UseCookiePolicy(new() { MinimumSameSitePolicy = SameSiteMode.None });
-app.UseAuthentication();
-app.UseAuthorization();
 app.UseEndpoints(endpoints =>
 {
     endpoints.MapControllers();
