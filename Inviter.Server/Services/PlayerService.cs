@@ -97,9 +97,13 @@ public class PlayerService
         RemovePlayer(player);
     }
 
-    private void Player_FriendsListRequested(PlayerInfo player, string searchText, int page)
+    private async void Player_FriendsListRequested(PlayerInfo player, string searchText, int page)
     {
-        throw new NotImplementedException();
+        var inviterContext = await _inviterContextFactory.CreateDbContextAsync();
+        var user = await inviterContext.Users.Include(u => u.Friends).FirstAsync(u => u.ID == player.User.ID);
+
+        var friends = user.Friends.Where(u => u.Username.Contains(searchText, StringComparison.InvariantCultureIgnoreCase)).Skip(page * 10).Take(10).ToList();
+        await player.SendFriendsList(friends);
     }
 
     private void Player_InviteStatusReceived(PlayerInfo player, Guid inviteId, InviteStatus status)
