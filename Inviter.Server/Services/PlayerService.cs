@@ -56,7 +56,7 @@ public class PlayerService
 
     private async void Player_InviteSent(PlayerInfo player, ulong targetId, ulong[] lobbyMembers)
     {
-        var inviterContext = await _inviterContextFactory.CreateDbContextAsync();
+        using var inviterContext = await _inviterContextFactory.CreateDbContextAsync();
         var sender = (await inviterContext.Users.FindAsync(player.User.ID))!;
         var target = await inviterContext.Users.Include(u => u.Friends).FirstOrDefaultAsync(u => u.ID == targetId);
         if (target is null)
@@ -99,16 +99,45 @@ public class PlayerService
 
     private async void Player_FriendsListRequested(PlayerInfo player, string searchText, int page)
     {
-        var inviterContext = await _inviterContextFactory.CreateDbContextAsync();
+        using var inviterContext = await _inviterContextFactory.CreateDbContextAsync();
         var user = await inviterContext.Users.Include(u => u.Friends).FirstAsync(u => u.ID == player.User.ID);
 
         var friends = user.Friends.Where(u => u.Username.Contains(searchText, StringComparison.InvariantCultureIgnoreCase)).Skip(page * 10).Take(10).ToList();
         await player.SendFriendsList(friends);
     }
 
-    private void Player_InviteStatusReceived(PlayerInfo player, Guid inviteId, InviteStatus status)
+    private async void Player_InviteStatusReceived(PlayerInfo player, Guid inviteId, InviteStatus status)
     {
-        throw new NotImplementedException();
+        if (status == InviteStatus.Ignored)
+        {
+            // TODO. Maybe log this.
+            return;
+        }
+
+        using var inviterContext = await _inviterContextFactory.CreateDbContextAsync();
+        var invite = await inviterContext.Invites.FirstOrDefaultAsync(i => i.ID == inviteId);
+
+        if (invite is null)
+        {
+            // TODO. Invite not found.
+            return;
+        }
+
+        invite.Status = status;
+        invite.End = _clock.GetCurrentInstant();
+        await inviterContext.SaveChangesAsync();
+
+        if (status == InviteStatus.Accepted)
+        {
+            // TODO. Send accepted status to the original sender.
+            return;
+        }
+
+        if (status == InviteStatus.Rejected)
+        {
+            // TODO. Send rejection status to the original sender.
+            return;
+        }
     }
 
     private void Unsubscribe(PlayerInfo player)

@@ -120,7 +120,7 @@ public class PlayerInfo
                 var iInt = doc.RootElement.GetProperty("status").GetInt32();
                 var invite = doc.RootElement.GetProperty("invite").GetString();
 
-                if (iInt < 0 || iInt > 4)
+                if (iInt < 1 || iInt > 3)
                     return;
                 if (!Guid.TryParse(invite, out var inviteId))
                     return;
@@ -138,12 +138,6 @@ public class PlayerInfo
         }
     }
 
-    private Task Send(object value)
-    {
-        var json = JsonSerializer.Serialize(value, options: InviterProtocol.JSON);
-        return _socket.SendAsync(Encoding.UTF8.GetBytes(json), WebSocketMessageType.Text, true, default);
-    }
-
     public Task SendInvite(Invite invite)
     {
         return Send(new { type = EventType.PlayerReceivedInvite, invite });
@@ -152,6 +146,12 @@ public class PlayerInfo
     public Task SendFriendsList(List<User> friends)
     {
         return Send(new { type = EventType.PlayerReceivedFriendsList, friends });
+    }
+
+    private Task Send(object value)
+    {
+        var json = JsonSerializer.Serialize(value, options: InviterProtocol.JSON);
+        return _socket.SendAsync(Encoding.UTF8.GetBytes(json), WebSocketMessageType.Text, true, default);
     }
 
     private void DisconnectIfInactive()
