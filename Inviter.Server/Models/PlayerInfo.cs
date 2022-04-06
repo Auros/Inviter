@@ -24,6 +24,7 @@ public class PlayerInfo
     public event Action<PlayerInfo, ulong, ulong[]>? InviteSent;
     public event Action<PlayerInfo, string, int>? FriendsListRequested;
     public event Action<PlayerInfo, Guid, InviteStatus>? InviteStatusReceived;
+    public event Action<PlayerInfo, string, Guid, Uri, Uri, int?>? InviteJoinRequestReceived;
 
     public PlayerInfo(User user, WebSocket socket, Action finisher, Instant startTime)
     {
@@ -131,6 +132,23 @@ public class PlayerInfo
             {
                 _time = _pollTime;
             }
+            else if (eventType is EventType.PlayerSentJoinRequest)
+            {
+                var code = doc.RootElement.GetProperty("code").GetString();
+                var inviteStr = doc.RootElement.GetProperty("invite").GetString();
+                var endPointStr = doc.RootElement.GetProperty("endPoint").GetString();
+                var statusUrlStr = doc.RootElement.GetProperty("statusUrl").GetString();
+
+                int? maxPartySize = doc.RootElement.TryGetProperty("maxPartySize", out var maxPartyElement) ? maxPartyElement.GetInt32() : null;
+
+                if (code is null || !Guid.TryParse(inviteStr, out Guid inviteId) || !Uri.TryCreate(endPointStr, UriKind.Absolute, out Uri? endPoint) || !Uri.TryCreate(statusUrlStr, UriKind.Absolute, out Uri? statusUrl))
+                {
+                    // Invalid join request, bad URLs
+                    return;
+                }
+
+                InviteJoinRequestReceived?.Invoke(this, code, inviteId, endPoint, statusUrl, maxPartySize);
+            }
         }
         catch
         {
@@ -146,6 +164,21 @@ public class PlayerInfo
     public Task SendFriendsList(List<User> friends)
     {
         return Send(new { type = EventType.PlayerReceivedFriendsList, friends });
+    }
+
+    public Task SendInviteAcceptance(Invite invite)
+    {
+        return Send(new { type = EventType.PlayerReceivedInviteAcceptance, invite });
+    }
+
+    public Task SendInviteDenial(Invite invite)
+    {
+        return Send(new { type = EventType.PlayerReceivedInviteDenial, invite });
+    }
+
+    public Task SendPlayerJoinInfo(string code, Uri endPoint, Uri statusUrl, int? maxPartySize)
+    {
+        return Send(new { type = EventType.PlayerReceivedJoinInfo, code, endPoint, statusUrl, maxPartySize });
     }
 
     private Task Send(object value)

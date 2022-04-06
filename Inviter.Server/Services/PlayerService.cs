@@ -52,6 +52,7 @@ public class PlayerService
         player.WantsToDisconnect += Player_WantsToDisconnect;
         player.FriendsListRequested += Player_FriendsListRequested;
         player.InviteStatusReceived += Player_InviteStatusReceived;
+        player.InviteJoinRequestReceived += Player_InviteJoinRequestReceived;
     }
 
     private async void Player_InviteSent(PlayerInfo player, ulong targetId, ulong[] lobbyMembers)
@@ -116,6 +117,7 @@ public class PlayerService
 
         using var inviterContext = await _inviterContextFactory.CreateDbContextAsync();
         var invite = await inviterContext.Invites.FirstOrDefaultAsync(i => i.ID == inviteId);
+        var user = await inviterContext.Users.FirstAsync(u => u.ID == player.User.ID);
 
         if (invite is null)
         {
@@ -123,25 +125,57 @@ public class PlayerService
             return;
         }
 
+        if (invite.Status == InviteStatus.Expired)
+        {
+            // Don't let users accept expired invites.
+            return;
+        }
+
         invite.Status = status;
         invite.End = _clock.GetCurrentInstant();
         await inviterContext.SaveChangesAsync();
+        _activePlayers.TryGetValue(invite.To.ID, out PlayerInfo? targetPlayer);
 
         if (status == InviteStatus.Accepted)
         {
-            // TODO. Send accepted status to the original sender.
+            if (targetPlayer is not null)
+                await targetPlayer.SendInviteAcceptance(invite);
+
             return;
         }
 
         if (status == InviteStatus.Rejected)
         {
-            // TODO. Send rejection status to the original sender.
+            if (targetPlayer is not null)
+                await targetPlayer.SendInviteDenial(invite);
             return;
         }
     }
 
+    private async void Player_InviteJoinRequestReceived(PlayerInfo player, string code, Guid inviteId, Uri endPoint, Uri statusUrl, int? maxPartySize)
+    {
+        using var inviterContext = await _inviterContextFactory.CreateDbContextAsync();
+        var invite = await inviterContext.Invites.FirstOrDefaultAsync(i => i.ID == inviteId);
+
+        if (invite is null)
+        {
+            // Invite not found
+            return;
+        }
+
+        // Ensure that the user have the ability to send the join info.
+        if (invite.From.ID != player.User.ID)
+        {
+            return;
+        }
+
+        if (_activePlayers.TryGetValue(invite.To.ID, out PlayerInfo? targetPlayer))
+            await targetPlayer.SendPlayerJoinInfo(code, endPoint, statusUrl, maxPartySize);
+    }
+
     private void Unsubscribe(PlayerInfo player)
     {
+        player.InviteJoinRequestReceived -= Player_InviteJoinRequestReceived;
         player.InviteStatusReceived -= Player_InviteStatusReceived;
         player.FriendsListRequested -= Player_FriendsListRequested;
         player.WantsToDisconnect -= Player_WantsToDisconnect;

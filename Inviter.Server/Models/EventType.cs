@@ -9,5 +9,9 @@ public enum EventType
     PlayerReceivedFriendsList = 4,
     PlayerSentFriendsListInfoRequest = 5,
     PlayerSubmittedInviteStatus = 6,
-    Ping = 7
+    Ping = 7,
+    PlayerReceivedInviteAcceptance = 8,
+    PlayerReceivedInviteDenial = 9,
+    PlayerSentJoinRequest = 10,
+    PlayerReceivedJoinInfo = 11,
 }
