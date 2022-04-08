@@ -12,7 +12,7 @@ public class PlayerService
     private readonly IDbContextFactory<InviterContext> _inviterContextFactory;
     private readonly ConcurrentDictionary<ulong, PlayerInfo> _activePlayers = new();
 
-    public PlayerService(IClock clock, ILogger logger, IDbContextFactory<InviterContext> inviterContextFactory)
+    public PlayerService(IClock clock, ILogger<PlayerService> logger, IDbContextFactory<InviterContext> inviterContextFactory)
     {
         _clock = clock;
         _logger = logger;
@@ -22,7 +22,7 @@ public class PlayerService
     public void AddPlayer(PlayerInfo playerInfo)
     {
         RemovePlayer(playerInfo);
-        _logger.LogInformation("Adding player {Player} ({PlayerID}) to manager", playerInfo.User.Username, playerInfo.User.ID);
+        _logger.LogInformation("Adding player {Player} ({PlayerID}) to the manager", playerInfo.User.Username, playerInfo.User.ID);
         _activePlayers.TryAdd(playerInfo.User.ID, playerInfo);
         Subscribe(playerInfo);
     }
@@ -32,7 +32,7 @@ public class PlayerService
         if (!_activePlayers.Remove(playerInfo.User.ID, out var player))
             return;
 
-        _logger.LogInformation("Removing player {Player} ({PlayerID}) from manager", playerInfo.User.Username, player.User.ID);
+        _logger.LogInformation("Removing player {Player} ({PlayerID}) from the manager", playerInfo.User.Username, player.User.ID);
         Unsubscribe(player);
         player.Disconnect();
     }
@@ -47,7 +47,6 @@ public class PlayerService
     private void Subscribe(PlayerInfo player)
     {
         player.InviteSent += Player_InviteSent;
-        player.WantsToDisconnect += Player_WantsToDisconnect;
         player.FriendsListRequested += Player_FriendsListRequested;
         player.InviteStatusReceived += Player_InviteStatusReceived;
         player.InviteJoinRequestReceived += Player_InviteJoinRequestReceived;
@@ -92,11 +91,6 @@ public class PlayerService
             _logger.LogInformation("{Sender} {SenderID} just sent an invite to {Target} ({TargetID})", sender.Username, sender.ID, target.Username, target.ID);
             await targetPlayer.SendInvite(invite);
         }    
-    }
-
-    private void Player_WantsToDisconnect(PlayerInfo player)
-    {
-        RemovePlayer(player);
     }
 
     private async void Player_FriendsListRequested(PlayerInfo player, string searchText, int page)
@@ -191,7 +185,6 @@ public class PlayerService
         player.InviteJoinRequestReceived -= Player_InviteJoinRequestReceived;
         player.InviteStatusReceived -= Player_InviteStatusReceived;
         player.FriendsListRequested -= Player_FriendsListRequested;
-        player.WantsToDisconnect -= Player_WantsToDisconnect;
         player.InviteSent -= Player_InviteSent;
     }
 }

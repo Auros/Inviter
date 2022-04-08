@@ -1,6 +1,7 @@
 using Inviter.Server;
 using Inviter.Server.Models;
 using Inviter.Server.Services;
+using Inviter.Server.Workers;
 using Microsoft.AspNetCore.WebSockets;
 using Microsoft.EntityFrameworkCore;
 using NodaTime;
@@ -29,13 +30,14 @@ builder.Services.AddControllers().AddJsonOptions(options =>
 });
 
 builder.Services.AddHttpClient();
+builder.Services.AddSingleton<PlayerService>();
 builder.Services.AddSingleton(inviterSettings!);
-builder.Services.AddDbContext<InviterContext>(dbOptions);
+builder.Services.AddHostedService<PlayerWorker>();
 builder.Services.AddSingleton<IClock>(SystemClock.Instance);
+builder.Services.AddDbContextFactory<InviterContext>(dbOptions);
 builder.Services.AddSingleton<ISoriginService, SoriginService>();
 builder.Services.AddSingleton(Assembly.GetExecutingAssembly().GetName().Version!);
 builder.Services.AddWebSockets(o => o.KeepAliveInterval = TimeSpan.FromMinutes(2f));
-builder.Services.AddDbContextFactory<InviterContext>(dbOptions, ServiceLifetime.Transient);
 
 var app = builder.Build();
 
@@ -54,10 +56,9 @@ app.UseEndpoints(endpoints =>
     });
 });
 
-IServiceScope scope = app.Services.CreateScope();
-var provider = scope.ServiceProvider;
-var inviterContext = provider.GetRequiredService<InviterContext>();
+var contextFactory = app.Services.GetRequiredService<IDbContextFactory<InviterContext>>();
+var inviterContext = await contextFactory.CreateDbContextAsync();
 try { await inviterContext.Database.MigrateAsync(); } catch { }
-scope.Dispose();
+inviterContext.Dispose();
 
 app.Run();

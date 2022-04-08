@@ -14,13 +14,13 @@ public class PlayerInfo
 
     private bool _enabled;
     private bool _polling;
+    private bool _disposed;
     private readonly byte[] _buffer = new byte[1024 * 4];
     private readonly CancellationTokenSource _cancellationTokenSource = new();
 
     private Instant _time;
     private Instant _pollTime;
 
-    public event Action<PlayerInfo>? WantsToDisconnect;
     public event Action<PlayerInfo, ulong, ulong[]>? InviteSent;
     public event Action<PlayerInfo, string, int>? FriendsListRequested;
     public event Action<PlayerInfo, Guid, InviteStatus>? InviteStatusReceived;
@@ -37,9 +37,12 @@ public class PlayerInfo
 
     public void Disconnect()
     {
+        if (_disposed)
+            return;
+        _disposed = true;
+
         Disable();
         _cancellationTokenSource.Dispose();
-        WantsToDisconnect?.Invoke(this);
         _finisher?.Invoke();
     }
 
@@ -194,7 +197,7 @@ public class PlayerInfo
 
     private void DisconnectIfInactive()
     {
-        if (_time + Duration.FromMinutes(2) > _pollTime)
+        if (_time + Duration.FromSeconds(5) > _pollTime)
             return;
 
         Disconnect();

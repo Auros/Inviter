@@ -29,10 +29,10 @@ public class SocketController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> Connect()
+    public async Task Connect()
     {
         if (!HttpContext.WebSockets.IsWebSocketRequest)
-            return BadRequest(new Error("Bad Request", "This is a websocket endpoint, please connect via websocket."));
+            HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
 
         // Accept the connection
         using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync();
@@ -46,7 +46,8 @@ public class SocketController : ControllerBase
         if (result is null)
         {
             await webSocket.CloseAsync(WebSocketCloseStatus.ProtocolError, "Did not receive anything in the alloted amount of time. Terminating connection.", default);
-            return BadRequest(new Error("No Auth", "Did not receive authorization data."));
+            HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
         }
         timeout.Dispose();
 
@@ -61,7 +62,8 @@ public class SocketController : ControllerBase
             const string errorMessage = "Could not log in user via Sorigin.";
             _logger.LogError(errorMessage);
             await webSocket.CloseAsync(WebSocketCloseStatus.PolicyViolation, errorMessage, default);
-            return BadRequest();
+            HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
         }
 
         var inviterContext = await _inviterContextFactory.CreateDbContextAsync(default);
@@ -90,20 +92,13 @@ public class SocketController : ControllerBase
         await inviterContext.SaveChangesAsync();
         await inviterContext.DisposeAsync();
 
-        await webSocket.SendAsync(Encoding.UTF8.GetBytes($"Hello, {user.Username}."), WebSocketMessageType.Text, true, default);
-
-        TaskCompletionSource source = new();
-        void Finished() => source.SetResult();
+        TaskCompletionSource<object> source = new();
+        void Finished() => source.SetResult(new());
 
         PlayerInfo playerInfo = new(user, webSocket, Finished, _clock.GetCurrentInstant());
-
-        _ = Task.Run(async () =>
-        {
-            await Task.Delay(5000);
-            Finished();
-        });
+        _playerService.AddPlayer(playerInfo);
 
         await source.Task;
-        return Ok("Connection complete.");
+        _playerService.RemovePlayer(playerInfo);
     }
 }
