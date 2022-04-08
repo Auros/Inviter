@@ -14,4 +14,5 @@ public enum EventType
     PlayerReceivedInviteDenial = 9,
     PlayerSentJoinRequest = 10,
     PlayerReceivedJoinInfo = 11,
+    Error = 12,
 }

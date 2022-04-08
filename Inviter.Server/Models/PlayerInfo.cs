@@ -181,6 +181,11 @@ public class PlayerInfo
         return Send(new { type = EventType.PlayerReceivedJoinInfo, code, endPoint, statusUrl, maxPartySize });
     }
 
+    public Task SendErrorMessage(string message)
+    {
+        return Send(new { type = EventType.Error, message });
+    }
+
     private Task Send(object value)
     {
         var json = JsonSerializer.Serialize(value, options: InviterProtocol.JSON);
