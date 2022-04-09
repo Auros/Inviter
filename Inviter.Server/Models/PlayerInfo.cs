@@ -22,8 +22,11 @@ public class PlayerInfo
     private Instant _pollTime;
 
     public event Action<PlayerInfo, ulong, ulong[]>? InviteSent;
+    public event Action<PlayerInfo, ulong>? FriendRequestReceived;
     public event Action<PlayerInfo, string, int>? FriendsListRequested;
+    public event Action<PlayerInfo, string, int>? FriendsRequestListRequested;
     public event Action<PlayerInfo, Guid, InviteStatus>? InviteStatusReceived;
+    public event Action<PlayerInfo, ulong, bool>? FriendRequestResponseReceived;
     public event Action<PlayerInfo, string, Guid, Uri, Uri, int?>? InviteJoinRequestReceived;
 
     public PlayerInfo(User user, WebSocket socket, Action finisher, Instant startTime)
@@ -152,6 +155,26 @@ public class PlayerInfo
 
                 InviteJoinRequestReceived?.Invoke(this, code, inviteId, endPoint, statusUrl, maxPartySize);
             }
+            else if (eventType is EventType.PlayerSentFriendRequest)
+            {
+                var userId = doc.RootElement.GetProperty("user").GetUInt64();
+                FriendRequestReceived?.Invoke(this, userId);
+            }
+            else if (eventType is EventType.PlayerSubmittedFriendRequest)
+            {
+                var wasAccepted = doc.RootElement.GetProperty("accepted").GetBoolean();
+                var requester = doc.RootElement.GetProperty("requester").GetUInt64();
+                FriendRequestResponseReceived?.Invoke(this, requester, wasAccepted);
+            }
+            else if (eventType is EventType.PlayerSentFriendRequestsListInfoRequest)
+            {
+                var page = doc.RootElement.GetProperty("page").GetInt32();
+                var search = doc.RootElement.GetProperty("search").GetString();
+                if (page < 0)
+                    page = 0;
+
+                FriendsRequestListRequested?.Invoke(this, search ?? string.Empty, page);
+            }
         }
         catch
         {
@@ -189,6 +212,26 @@ public class PlayerInfo
         return Send(new { type = EventType.Error, message });
     }
 
+    public Task SendFriendRequestInfo(User requester)
+    {
+        return Send(new { type = EventType.PlayerReceivedFriendRequest, user = requester });
+    }
+
+    public Task SendFriendRequestAccepted(User requestee)
+    {
+        return Send(new { type = EventType.PlayerReceivedFriendAcceptance, user = requestee });
+    }
+
+    public Task SendFriendRequestDenied(User requestee)
+    {
+        return Send(new { type = EventType.PlayerReceivedFriendDenial, user = requestee });
+    }
+
+    public Task SendFriendRequestsList(List<User> friends)
+    {
+        return Send(new { type = EventType.PlayerReceivedFriendRequestList, friends });
+    }
+
     private Task Send(object value)
     {
         var json = JsonSerializer.Serialize(value, options: InviterProtocol.JSON);
@@ -197,7 +240,7 @@ public class PlayerInfo
 
     private void DisconnectIfInactive()
     {
-        if (_time + Duration.FromSeconds(5) > _pollTime)
+        if (_time + Duration.FromMinutes(2) > _pollTime)
             return;
 
         Disconnect();

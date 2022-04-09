@@ -16,6 +16,10 @@ public class User
 
     public bool AllowInvitesFromEveryone { get; set; }
 
+    public bool AllowFriendRequests { get; set; } = true;
+
+    public List<User> FriendRequests { get; set; } = new();
+
     public List<User> Friends { get; set; } = new();
 
     public Instant LastSeen { get; set; }

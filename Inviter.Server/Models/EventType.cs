@@ -15,4 +15,11 @@ public enum EventType
     PlayerSentJoinRequest = 10,
     PlayerReceivedJoinInfo = 11,
     Error = 12,
+    PlayerSentFriendRequest = 13,
+    PlayerReceivedFriendRequest = 14,
+    PlayerSubmittedFriendRequest = 15,
+    PlayerReceivedFriendAcceptance = 16,
+    PlayerReceivedFriendDenial = 17,
+    PlayerReceivedFriendRequestList = 18,
+    PlayerSentFriendRequestsListInfoRequest = 19
 }
